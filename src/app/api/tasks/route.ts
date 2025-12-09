@@ -22,6 +22,14 @@ export async function GET() {
             image: true,
           },
         },
+        partner: {
+          select: {
+            id: true,
+            name: true,
+            platform: true,
+            partnerStatus: true,
+          },
+        },
       },
     });
 
@@ -45,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { summary, description, priority } = body;
+    const { summary, description, priority, taskType, partnerId } = body;
 
     if (!summary || typeof summary !== "string" || summary.trim() === "") {
       return NextResponse.json(
@@ -54,11 +62,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create issue in Jira
+    // Fetch partner name if partnerId is provided
+    let partnerName: string | null = null;
+    if (partnerId) {
+      const partner = await prisma.partner.findUnique({
+        where: { id: partnerId },
+        select: { name: true },
+      });
+      partnerName = partner?.name || null;
+    }
+
+    // Create issue in Jira with partner and task type metadata
     const jiraIssue = await createJiraIssue({
       summary: summary.trim(),
       description: description?.trim(),
       priority: priority || "Medium",
+      partnerName,
+      taskType: taskType || null,
     });
 
     // Save to local database
@@ -70,7 +90,9 @@ export async function POST(request: NextRequest) {
         description: description?.trim() || null,
         status: jiraIssue.fields.status.name,
         priority: jiraIssue.fields.priority.name,
+        taskType: taskType || null,
         userId: session.user.id,
+        partnerId: partnerId || null, // null = "Other" (no specific partner)
         lastSyncedAt: new Date(),
       },
       include: {
@@ -79,6 +101,14 @@ export async function POST(request: NextRequest) {
             name: true,
             email: true,
             image: true,
+          },
+        },
+        partner: {
+          select: {
+            id: true,
+            name: true,
+            platform: true,
+            partnerStatus: true,
           },
         },
       },

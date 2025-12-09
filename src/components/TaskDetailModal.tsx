@@ -14,6 +14,7 @@ import {
   X,
   Check,
   Loader2,
+  Building2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,16 @@ import {
   getStatusColor,
   getPriorityColor,
 } from "@/lib/utils";
+import {
+  PLATFORMS,
+  PARTNER_STATUSES,
+  getStatusColors,
+  getPlatformColors,
+  getTaskTypeLabel,
+  getTaskTypeColors,
+} from "@/lib/partner-utils";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface TaskWithUser {
   id: string;
@@ -49,6 +59,7 @@ interface TaskWithUser {
   description: string | null;
   status: string;
   priority: string;
+  taskType?: string | null;
   assignee?: string | null;
   lastSyncedAt?: string | null;
   createdAt: string;
@@ -58,6 +69,12 @@ interface TaskWithUser {
     email: string | null;
     image: string | null;
   };
+  partner?: {
+    id: string;
+    name: string;
+    platform: string | null;
+    partnerStatus: string;
+  } | null;
 }
 
 interface Transition {
@@ -328,6 +345,53 @@ export function TaskDetailModal({
 
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-4">
+            {/* Partner */}
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium text-muted-foreground">
+                Partner
+              </h4>
+              {task.partner ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <Link
+                    href="/partners"
+                    className="text-sm hover:underline text-foreground"
+                  >
+                    {task.partner.name}
+                  </Link>
+                  {task.partner.platform && (
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        "text-xs",
+                        getPlatformColors(task.partner.platform).bg,
+                        getPlatformColors(task.partner.platform).text
+                      )}
+                    >
+                      {PLATFORMS[task.partner.platform as keyof typeof PLATFORMS] || task.partner.platform}
+                    </Badge>
+                  )}
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "text-xs",
+                      getStatusColors(task.partner.partnerStatus).bg,
+                      getStatusColors(task.partner.partnerStatus).text
+                    )}
+                  >
+                    {PARTNER_STATUSES[task.partner.partnerStatus as keyof typeof PARTNER_STATUSES] || task.partner.partnerStatus}
+                  </Badge>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm italic text-muted-foreground">
+                    Other (No specific partner)
+                  </span>
+                </div>
+              )}
+            </div>
+
             {/* Priority */}
             <div className="space-y-1">
               <h4 className="text-sm font-medium text-muted-foreground">
@@ -342,6 +406,26 @@ export function TaskDetailModal({
                 />
                 <span className="text-sm">{task.priority}</span>
               </div>
+            </div>
+
+            {/* Task Type */}
+            <div className="space-y-1">
+              <h4 className="text-sm font-medium text-muted-foreground">
+                Task Type
+              </h4>
+              {task.taskType ? (
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    getTaskTypeColors(task.taskType).bg,
+                    getTaskTypeColors(task.taskType).text
+                  )}
+                >
+                  {getTaskTypeLabel(task.taskType)}
+                </Badge>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
             </div>
 
             {/* Status Transition */}

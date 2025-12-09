@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn, formatDate, getStatusColor, getPriorityColor } from "@/lib/utils";
+import { getTaskTypeLabel, getTaskTypeColors } from "@/lib/partner-utils";
 import { toast } from "sonner";
 
 interface TaskWithUser {
@@ -23,12 +24,19 @@ interface TaskWithUser {
   description: string | null;
   status: string;
   priority: string;
+  taskType?: string | null;
   createdAt: string;
   createdBy: {
     name: string | null;
     email: string | null;
     image: string | null;
   };
+  partner?: {
+    id: string;
+    name: string;
+    platform: string | null;
+    partnerStatus: string;
+  } | null;
 }
 
 interface Transition {
@@ -127,6 +135,29 @@ export function TaskCard({ task, onStatusChange, onTaskClick }: TaskCardProps) {
             <h3 className="font-semibold text-base line-clamp-2">
               {task.summary}
             </h3>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              {task.partner ? (
+                <span className="text-xs text-muted-foreground">
+                  {task.partner.name}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground italic">
+                  Other
+                </span>
+              )}
+              {task.taskType && (
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    "text-xs",
+                    getTaskTypeColors(task.taskType).bg,
+                    getTaskTypeColors(task.taskType).text
+                  )}
+                >
+                  {getTaskTypeLabel(task.taskType)}
+                </Badge>
+              )}
+            </div>
           </div>
 
           <div onClick={(e) => e.stopPropagation()}>

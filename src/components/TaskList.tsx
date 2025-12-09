@@ -14,6 +14,7 @@ interface TaskWithUser {
   description: string | null;
   status: string;
   priority: string;
+  taskType?: string | null;
   assignee?: string | null;
   lastSyncedAt?: string | null;
   createdAt: string;
@@ -23,6 +24,12 @@ interface TaskWithUser {
     email: string | null;
     image: string | null;
   };
+  partner?: {
+    id: string;
+    name: string;
+    platform: string | null;
+    partnerStatus: string;
+  } | null;
 }
 
 interface TaskListProps {

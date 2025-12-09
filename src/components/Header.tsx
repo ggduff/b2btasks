@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Shield, User } from "lucide-react";
+import { LogOut, Shield, User, Users } from "lucide-react";
 import Link from "next/link";
 
 export function Header() {
@@ -35,6 +35,17 @@ export function Header() {
           <span className="hidden sm:inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
             B2B Task Tracker
           </span>
+          {session?.user && (
+            <nav className="hidden md:flex items-center gap-1 ml-4">
+              <Link
+                href="/partners"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
+              >
+                <Users className="h-4 w-4" />
+                Partners
+              </Link>
+            </nav>
+          )}
         </div>
 
         <div className="flex items-center gap-4">

@@ -23,12 +23,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { PartnerSelector } from "./PartnerSelector";
+import { QuickPartnerDialog } from "./QuickPartnerDialog";
+import { TASK_TYPES } from "@/lib/partner-utils";
 
 interface CreateTaskDialogProps {
   onTaskCreated: () => void;
 }
 
 const PRIORITIES = ["Highest", "High", "Medium", "Low", "Lowest"];
+const TASK_TYPE_OPTIONS = Object.entries(TASK_TYPES) as [string, string][];
 
 export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
   const [open, setOpen] = useState(false);
@@ -36,6 +40,10 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
   const [summary, setSummary] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("Medium");
+  const [taskType, setTaskType] = useState<string>("");
+  const [partnerId, setPartnerId] = useState<string | null | undefined>(undefined);
+  const [showQuickPartner, setShowQuickPartner] = useState(false);
+  const [partnerError, setPartnerError] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +52,14 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
       toast.error("Summary is required");
       return;
     }
+
+    // Partner is required (but can be null for "Other")
+    if (partnerId === undefined) {
+      setPartnerError(true);
+      toast.error("Please select a partner or choose 'Other'");
+      return;
+    }
+    setPartnerError(false);
 
     setIsLoading(true);
     try {
@@ -54,6 +70,8 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
           summary: summary.trim(),
           description: description.trim() || undefined,
           priority,
+          taskType: taskType || null,
+          partnerId, // null = "Other", string = specific partner
         }),
       });
 
@@ -69,6 +87,9 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
       setSummary("");
       setDescription("");
       setPriority("Medium");
+      setTaskType("");
+      setPartnerId(undefined);
+      setPartnerError(false);
       setOpen(false);
       onTaskCreated();
     } catch (error) {
@@ -99,6 +120,46 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            {/* Partner - First field */}
+            <div className="grid gap-2">
+              <Label>Partner *</Label>
+              <PartnerSelector
+                value={partnerId === undefined ? undefined : partnerId}
+                onSelect={(id) => {
+                  setPartnerId(id);
+                  setPartnerError(false);
+                }}
+                onCreateNew={() => setShowQuickPartner(true)}
+                disabled={isLoading}
+                hasError={partnerError}
+              />
+              <p className="text-xs text-muted-foreground">
+                Select the partner this task is for, or choose &quot;Other&quot; if not partner-specific.
+              </p>
+            </div>
+
+            {/* Task Type - Second field */}
+            <div className="grid gap-2">
+              <Label htmlFor="taskType">Task Type</Label>
+              <Select
+                value={taskType}
+                onValueChange={setTaskType}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select task type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_TYPE_OPTIONS.map(([key, label]) => (
+                    <SelectItem key={key} value={key}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Summary */}
             <div className="grid gap-2">
               <Label htmlFor="summary">Summary *</Label>
               <Input
@@ -110,6 +171,7 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
               />
             </div>
 
+            {/* Description */}
             <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
@@ -118,10 +180,11 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isLoading}
-                rows={4}
+                rows={3}
               />
             </div>
 
+            {/* Priority */}
             <div className="grid gap-2">
               <Label htmlFor="priority">Priority</Label>
               <Select
@@ -158,6 +221,15 @@ export function CreateTaskDialog({ onTaskCreated }: CreateTaskDialogProps) {
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <QuickPartnerDialog
+        open={showQuickPartner}
+        onOpenChange={setShowQuickPartner}
+        onPartnerCreated={(id) => {
+          setPartnerId(id);
+          setPartnerError(false);
+        }}
+      />
     </Dialog>
   );
 }

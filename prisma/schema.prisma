@@ -76,9 +76,13 @@ model Task {
   status       String    @default("To Do")
   priority     String    @default("Medium")
   assignee     String?              // Jira username/email
+  taskType     String?              // NEW_PRODUCT_CONFIG | CONFIG_UPDATE | INFRASTRUCTURE | OTHER
 
   createdBy    User      @relation(fields: [userId], references: [id])
   userId       String
+
+  partner      Partner?  @relation(fields: [partnerId], references: [id])
+  partnerId    String?              // Null = "Other" (no specific partner)
 
   comments     Comment[]
 
@@ -105,4 +109,34 @@ model Comment {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+model Partner {
+  id              String      @id @default(cuid())
+  name            String      @unique
+  uploadKey       String      @unique  // 32-char alphanumeric for uploader system
+  dateAdded       DateTime    @default(now())
+
+  // Classification
+  platform        String?     // WHMCS | BROKER_PANEL | PARTNER_PORTAL
+  partnerType     String?     // BROKER | AFFILIATE | EA | OTHER
+  config          String?     // LOCKED_DOWN | STANDARD | CUSTOM
+  partnerStatus   String      @default("PRE_SALES")  // PRE_SALES | IN_PROGRESS | LIVE | INACTIVE
+
+  // Features
+  hasLandingPage  Boolean     @default(false)
+
+  // Contact
+  supportChannel  String?     // Free text: Skype, Teams, Email, Slack, etc.
+  contactName     String?
+  contactEmail    String?
+
+  // Business
+  commission      Int?        // Percentage (0-100), only for affiliates
+  notes           String?     // Admin notes about the partner
+
+  tasks           Task[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }

@@ -31,6 +31,14 @@ export async function GET(
             image: true,
           },
         },
+        partner: {
+          select: {
+            id: true,
+            name: true,
+            platform: true,
+            partnerStatus: true,
+          },
+        },
       },
     });
 
@@ -113,6 +121,14 @@ export async function PATCH(
             name: true,
             email: true,
             image: true,
+          },
+        },
+        partner: {
+          select: {
+            id: true,
+            name: true,
+            platform: true,
+            partnerStatus: true,
           },
         },
       },

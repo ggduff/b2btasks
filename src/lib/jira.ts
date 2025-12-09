@@ -74,6 +74,84 @@ export interface CreateIssueParams {
   summary: string;
   description?: string;
   priority?: string;
+  partnerName?: string | null;
+  taskType?: string | null;
+}
+
+// ============================================================================
+// Label & Description Helpers for Partner/TaskType Integration
+// ============================================================================
+
+/**
+ * Sanitize a string for use as a Jira label
+ * Labels: alphanumeric, hyphen, underscore only (max 255 chars)
+ */
+export function sanitizeForLabel(value: string): string {
+  return value
+    .replace(/\s+/g, '-')           // spaces to hyphens
+    .replace(/[^a-zA-Z0-9\-_]/g, '') // remove invalid chars
+    .substring(0, 100);              // reasonable length limit
+}
+
+/**
+ * Build labels array for a task
+ */
+export function buildTaskLabels(
+  baseLabel: string,
+  partnerName?: string | null,
+  taskType?: string | null
+): string[] {
+  const labels = [baseLabel];
+  if (partnerName) {
+    labels.push(`partner:${sanitizeForLabel(partnerName)}`);
+  }
+  if (taskType) {
+    labels.push(`type:${taskType}`);
+  }
+  return labels;
+}
+
+/**
+ * Build description with metadata header for Jira visibility
+ */
+export function buildDescriptionWithHeader(
+  description: string | undefined,
+  partnerName?: string | null,
+  taskType?: string | null
+): string | undefined {
+  const parts: string[] = [];
+  if (partnerName) parts.push(`Partner: ${partnerName}`);
+  if (taskType) {
+    const typeLabels: Record<string, string> = {
+      NEW_PRODUCT_CONFIG: 'New Product Config',
+      CONFIG_UPDATE: 'Config Update',
+      INFRASTRUCTURE: 'Infrastructure',
+      OTHER: 'Other',
+    };
+    parts.push(`Type: ${typeLabels[taskType] || taskType}`);
+  }
+  if (parts.length === 0) return description;
+  const header = `[${parts.join(' | ')}]`;
+  return description ? `${header}\n\n${description}` : header;
+}
+
+/**
+ * Extract partner name from Jira labels
+ */
+export function extractPartnerFromLabels(labels: string[]): string | null {
+  const partnerLabel = labels.find(l => l.startsWith('partner:'));
+  return partnerLabel ? partnerLabel.substring('partner:'.length) : null;
+}
+
+/**
+ * Extract task type from Jira labels
+ */
+export function extractTaskTypeFromLabels(labels: string[]): string | null {
+  const typeLabel = labels.find(l => l.startsWith('type:'));
+  if (!typeLabel) return null;
+  const taskType = typeLabel.substring('type:'.length);
+  const validTypes = ['NEW_PRODUCT_CONFIG', 'CONFIG_UPDATE', 'INFRASTRUCTURE', 'OTHER'];
+  return validTypes.includes(taskType) ? taskType : null;
 }
 
 /**
@@ -82,13 +160,19 @@ export interface CreateIssueParams {
 export async function createJiraIssue(
   params: CreateIssueParams
 ): Promise<JiraIssue> {
-  const { summary, description, priority = "Medium" } = params;
+  const { summary, description, priority = "Medium", partnerName, taskType } = params;
+
+  // Build enhanced description with metadata header
+  const enhancedDescription = buildDescriptionWithHeader(description, partnerName, taskType);
+
+  // Build labels including partner and task type
+  const labels = buildTaskLabels(JIRA_LABEL, partnerName, taskType);
 
   const body = {
     fields: {
       project: { key: JIRA_PROJECT_KEY },
       summary,
-      description: description
+      description: enhancedDescription
         ? {
             type: "doc",
             version: 1,
@@ -98,7 +182,7 @@ export async function createJiraIssue(
                 content: [
                   {
                     type: "text",
-                    text: description,
+                    text: enhancedDescription,
                   },
                 ],
               },
@@ -107,7 +191,7 @@ export async function createJiraIssue(
         : undefined,
       issuetype: { name: "Task" },
       priority: { name: priority },
-      labels: [JIRA_LABEL],
+      labels,
     },
   };
 

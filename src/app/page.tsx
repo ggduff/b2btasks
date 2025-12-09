@@ -25,6 +25,7 @@ interface TaskWithUser {
   description: string | null;
   status: string;
   priority: string;
+  taskType?: string | null;
   createdAt: string;
   lastSyncedAt: string | null;
   createdBy: {
@@ -32,16 +33,30 @@ interface TaskWithUser {
     email: string | null;
     image: string | null;
   };
+  partner?: {
+    id: string;
+    name: string;
+    platform: string | null;
+    partnerStatus: string;
+  } | null;
+}
+
+interface Partner {
+  id: string;
+  name: string;
+  partnerStatus: string;
 }
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [tasks, setTasks] = useState<TaskWithUser[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [partnerFilter, setPartnerFilter] = useState<string>("all");
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -67,13 +82,26 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchPartners = useCallback(async () => {
+    try {
+      const response = await fetch("/api/partners");
+      if (response.ok) {
+        const data = await response.json();
+        setPartners(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch partners:", error);
+    }
+  }, []);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
     } else if (status === "authenticated") {
       fetchTasks();
+      fetchPartners();
     }
-  }, [status, router, fetchTasks]);
+  }, [status, router, fetchTasks, fetchPartners]);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -96,8 +124,18 @@ export default function Dashboard() {
   };
 
   const filteredTasks = tasks.filter((task) => {
-    if (statusFilter === "all") return true;
-    return task.status.toLowerCase().includes(statusFilter.toLowerCase());
+    // Status filter
+    if (statusFilter !== "all" && !task.status.toLowerCase().includes(statusFilter.toLowerCase())) {
+      return false;
+    }
+    // Partner filter
+    if (partnerFilter !== "all") {
+      if (partnerFilter === "other") {
+        return task.partner === null;
+      }
+      return task.partner?.id === partnerFilter;
+    }
+    return true;
   });
 
   // Get unique statuses for filter dropdown
@@ -131,10 +169,10 @@ export default function Dashboard() {
 
         {/* Filters and Actions */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 p-4 rounded-lg border bg-card">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -142,6 +180,20 @@ export default function Dashboard() {
                 {uniqueStatuses.map((status) => (
                   <SelectItem key={status} value={status.toLowerCase()}>
                     {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={partnerFilter} onValueChange={setPartnerFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by partner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Partners</SelectItem>
+                <SelectItem value="other">Other (No Partner)</SelectItem>
+                {partners.map((partner) => (
+                  <SelectItem key={partner.id} value={partner.id}>
+                    {partner.name}
                   </SelectItem>
                 ))}
               </SelectContent>

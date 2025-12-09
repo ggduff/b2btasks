@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { searchTrackedIssues, extractDescriptionText } from "@/lib/jira";
+import {
+  searchTrackedIssues,
+  extractDescriptionText,
+  extractPartnerFromLabels,
+  extractTaskTypeFromLabels,
+  sanitizeForLabel,
+} from "@/lib/jira";
 
 // POST /api/tasks/sync - Sync tasks from Jira
 export async function POST() {
@@ -15,6 +21,16 @@ export async function POST() {
     // Fetch all tracked issues from Jira
     const jiraIssues = await searchTrackedIssues();
 
+    // Pre-fetch all partners for efficient lookup during sync
+    const allPartners = await prisma.partner.findMany({
+      select: { id: true, name: true },
+    });
+    const partnerLookup = new Map<string, string>();
+    for (const partner of allPartners) {
+      // Map sanitized lowercase partner name to partner ID for matching
+      partnerLookup.set(sanitizeForLabel(partner.name).toLowerCase(), partner.id);
+    }
+
     let synced = 0;
     let created = 0;
     let updated = 0;
@@ -23,6 +39,17 @@ export async function POST() {
       const existingTask = await prisma.task.findUnique({
         where: { jiraKey: jiraIssue.key },
       });
+
+      // Extract partner and task type from Jira labels for recovery
+      const labels = jiraIssue.fields.labels || [];
+      const labelPartnerName = extractPartnerFromLabels(labels);
+      const labelTaskType = extractTaskTypeFromLabels(labels);
+
+      // Try to recover partner ID from label
+      let recoveredPartnerId: string | null = null;
+      if (labelPartnerName) {
+        recoveredPartnerId = partnerLookup.get(labelPartnerName.toLowerCase()) || null;
+      }
 
       const taskData = {
         jiraId: jiraIssue.id,
@@ -35,10 +62,18 @@ export async function POST() {
       };
 
       if (existingTask) {
-        // Update existing task
+        // Update existing task - only recover partner/taskType if currently null
+        const updateData: Record<string, unknown> = { ...taskData };
+        if (existingTask.partnerId === null && recoveredPartnerId) {
+          updateData.partnerId = recoveredPartnerId;
+        }
+        if (existingTask.taskType === null && labelTaskType) {
+          updateData.taskType = labelTaskType;
+        }
+
         await prisma.task.update({
           where: { jiraKey: jiraIssue.key },
-          data: taskData,
+          data: updateData,
         });
         updated++;
       } else {
@@ -47,6 +82,8 @@ export async function POST() {
           data: {
             jiraKey: jiraIssue.key,
             ...taskData,
+            partnerId: recoveredPartnerId,
+            taskType: labelTaskType,
             userId: session.user.id, // Assign to current user if created via Jira
           },
         });
@@ -64,6 +101,14 @@ export async function POST() {
             name: true,
             email: true,
             image: true,
+          },
+        },
+        partner: {
+          select: {
+            id: true,
+            name: true,
+            platform: true,
+            partnerStatus: true,
           },
         },
       },
